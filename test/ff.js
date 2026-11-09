@@ -103,4 +103,49 @@ describe("FundraiserFactory", function () {
 
   });
   });
+
+  describe("creating a fundraiser", () => {
+    it("increments the count and emits FundraiserCreated", async () => {
+      const { fundraiserFactory } = await loadFixture(runEveryTime);
+      [owner, beneficiary] = await ethers.getSigners();
+      await expect(
+        fundraiserFactory.createFundraiser("Test", "test.com", "test.png", "Test description", beneficiary)
+      ).to.emit(fundraiserFactory, "FundraiserCreated");
+      expect(await fundraiserFactory.fundraisersCount()).to.equal(1);
+    });
+  });
+
+  describe("fundraiser details", () => {
+    it("stores url, imageURL, description and beneficiary", async () => {
+      const { fundraiserFactory } = await loadFixture(runEveryTime);
+      await addFundraisers(fundraiserFactory, 3);
+      const fundraiserAddr = await fundraiserFactory.getFundraiserAt(2);
+      const fundraiser = (await ethers.getContractFactory("Fundraiser")).attach(fundraiserAddr);
+      expect(await fundraiser.url()).to.equal("beneficiary2.com");
+      expect(await fundraiser.imageURL()).to.equal("beneficiary2.png");
+      expect(await fundraiser.description()).to.equal("Description for Beneficiary 2");
+      expect(await fundraiser.beneficiary()).to.equal(beneficiary.address);
+    });
+  });
+
+  describe("varying limits", () => {
+    it("caps results at maxLimit (20) when limit is larger", async () => {
+      const { fundraiserFactory } = await loadFixture(runEveryTime);
+      await addFundraisers(fundraiserFactory, 30);
+      const fundraisers = await fundraiserFactory.fundraisers(30, 0);
+      expect(fundraisers.length).to.equal(20);
+    });
+  });
+
+  describe("varying offset", () => {
+    it("returns only the remaining fundraisers in order", async () => {
+      const { fundraiserFactory } = await loadFixture(runEveryTime);
+      await addFundraisers(fundraiserFactory, 30);
+      const fundraisers = await fundraiserFactory.fundraisers(10, 25);
+      expect(fundraisers.length).to.equal(5);
+      expect(fundraisers[0]).to.equal(await fundraiserFactory.getFundraiserAt(25));
+      const last = (await ethers.getContractFactory("Fundraiser")).attach(fundraisers[4]);
+      expect(await last.name()).to.equal("Beneficiary 29");
+    });
+  });
 });
